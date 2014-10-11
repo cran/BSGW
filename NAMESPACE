@@ -1,0 +1,9 @@
+import(survival)
+export(bsgw, bsgw.crossval, bsgw.crossval.wrapper, bsgw.generate.folds, bsgw.generate.folds.eventbalanced, bsgw.control)
+
+S3method(print, bsgw)
+S3method(plot, bsgw)
+S3method(predict, bsgw)
+S3method(summary, bsgw)
+S3method(print, summary.bsgw)
+S3method(summary, predict.bsgw)

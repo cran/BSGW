@@ -1,0 +1,12 @@
+2f6ac6e0b03bb3f74be59f2669fb4834 *DESCRIPTION
+bfe0a0ea072d7bdcbcc27dee4675f9b9 *NAMESPACE
+69c655fc2ee57c51dcaea051fbc6d48c *R/BSGW.R
+e80346cf3ec659fc3250fc0e2dc8aa8f *R/Sample.R
+f401084e500c17af35128c0029109b62 *R/SliceSampler.R
+c111d9f5f2bc8e33b0851aafc23dd04e *R/utils.R
+42defbef83cc68886f6f13df28734dbe *R/zzz.R
+d8ead9dc48b9ba75dfc758d1d5b82715 *man/bsgw.Rd
+f9a0f2255f31abaa6f60a6bd6accf014 *man/crossval_bsgw.Rd
+3b70b1be2b38f3cc0c0be56a3a830513 *man/plot_bsgw.Rd
+1a2c999eb5dba5372b0ce5dbd595918a *man/predict_bsgw.Rd
+7ffaf0290c3467321952d30e3de1a016 *man/summary_bsgw.Rd
