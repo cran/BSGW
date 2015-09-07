@@ -13,8 +13,10 @@ Convenience functions for cross-validation-based selection of shrinkage paramete
 \usage{
 bsgw.generate.folds(ntot, nfold=5)
 bsgw.generate.folds.eventbalanced(formula, data, nfold=5)
-bsgw.crossval(data, folds, all=FALSE, print.level=1, control=bsgw.control(), ...)
-bsgw.crossval.wrapper(data, folds, all=FALSE, print.level=1, control=bsgw.control()
+bsgw.crossval(data, folds, all=FALSE, print.level=1
+  , control=bsgw.control(), ncores=1, ...)
+bsgw.crossval.wrapper(data, folds, all=FALSE, print.level=1
+  , control=bsgw.control(), ncores=1
   , lambda.vec=exp(seq(from=log(0.01), to=log(100), length.out = 10)), lambdas.vec=NULL
   , lambda2=if (is.null(lambdas.vec)) cbind(lambda=lambda.vec, lambdas=lambda.vec)
       else as.matrix(expand.grid(lambda=lambda.vec, lambdas=lambdas.vec))
@@ -30,6 +32,7 @@ bsgw.crossval.wrapper(data, folds, all=FALSE, print.level=1, control=bsgw.contro
   \item{all}{If \code{TRUE}, estimation objects from each cross-validation task is collected and returned for diagnostics purposes.}
   \item{print.level}{Verbosity of progress report.}
   \item{control}{List of control parameters, usually the output of \link{bsgw.control}.}
+  \item{ncores}{Number of cores for parallel execution of cross-validation code.}
   \item{lambda.vec}{Vector of shrinkage parameters to be tested for scale-parameter coefficients.}
   \item{lambdas.vec}{Vector of shrinkage parameters to be tested for shape-parameter coefficients.}
   \item{lambda2}{A data frame that enumerates all combinations of \code{lambda} and \code{lambdas} to be tested. By default, it is constructed from forming all permutations of \code{lambda.vec} and \code{lambdas.vec}. If \code{lambdas.vec=NULL}, it will only try equal values of the two parameters in each combination.}
@@ -57,5 +60,4 @@ cv2 <- bsgw.crossval.wrapper(ovarian, folds, formula=Surv(futime, fustat) ~ ecog
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
-\keyword{ ~kwd1 }
-\keyword{ ~kwd2 }% __ONLY ONE__ keyword per line
+

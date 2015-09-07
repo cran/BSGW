@@ -1,4 +1,4 @@
-bsgw.control <- function(scalex=TRUE, iter=1000, burnin=round(iter/2), sd.thresh=1e-4, lambda=0.0, lambdas=0.0, nskip=10, alpha.min=0.1, alpha.max=10.0
+bsgw.control <- function(scalex=TRUE, iter=1000, burnin=round(iter/2), sd.thresh=1e-4, lambda=0.0, lambdas=lambda, nskip=round(iter/10), alpha.min=0.1, alpha.max=10.0
                          , beta.max=log(20), betas.max=5.0, memlim.gb=8) {
   return (list(scalex=scalex, iter=iter, burnin=burnin, sd.thresh=sd.thresh, lambda=lambda, lambdas=lambdas, nskip=nskip
                , alpha.min=alpha.min, alpha.max=alpha.max, beta.max=beta.max, betas.max=betas.max, memlim.gb=memlim.gb))

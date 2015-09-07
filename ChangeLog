@@ -1,0 +1,10 @@
+Changes in version 0.9.1
+  * Fixed penalty terms in log-posterior (changed sign of lambda terms in bsgw.logpost from positive to negative).
+  * Removed placeholder keyword sections from .Rd files.
+  * Switched from local implementation of slice sampler and the multivariate wrapper to MfUSampler package; therefore, file SliceSampler.R was removed.
+  * Added package name as alias to bsgw.Rd help file.
+  * Added parallelization to cross-val functions (both inner and outer options).
+  * Added parallelization to predict function.
+  * Change default value of lambdas in bsgw.control to be equal to lambda.
+  * Changed default nskip in bsgw.control to be 1/10 of iter.
+

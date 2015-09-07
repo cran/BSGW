@@ -1,4 +1,5 @@
 \name{bsgw}
+\alias{BSGW}
 \alias{bsgw}
 \alias{print.bsgw}
 \alias{bsgw.control}
@@ -13,7 +14,7 @@ Bayesian survival model - with stratification and shrinkage - using Weibull regr
 bsgw(formula, data, formulas=formula, weights, subset, na.action=na.fail, init="survreg"
   , ordweib=FALSE, scale=0, control=bsgw.control(), print.level=2)
 bsgw.control(scalex=TRUE, iter=1000, burnin=round(iter/2), sd.thresh=1e-4
-  , lambda=0.0, lambdas=0.0, nskip=10, alpha.min=0.1, alpha.max=10.0
+  , lambda=0.0, lambdas=lambda, nskip=round(iter/10), alpha.min=0.1, alpha.max=10.0
   , beta.max=log(20), betas.max=5.0, memlim.gb=8)
 \method{print}{bsgw}(x, ...)
 }
@@ -114,5 +115,4 @@ cat("population average of survreg-style scale parameter from bsgw model:"
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
-\keyword{ ~kwd1 }
-\keyword{ ~kwd2 }% __ONLY ONE__ keyword per line
+

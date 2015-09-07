@@ -347,7 +347,7 @@ print.summary.bsgw <- function(x, ...) {
   print(x$coefficients$betas)
 }
 
-predict.bsgw <- function(object, newdata=NULL, tvec=NULL, burnin=object$control$burnin, ...) {
+predict.bsgw <- function(object, newdata=NULL, tvec=NULL, burnin=object$control$burnin, ncores=1, ...) {
   iter <- object$control$iter
   alpha.min <- object$control$alpha.min
   alpha.max <- object$control$alpha.max
@@ -377,37 +377,63 @@ predict.bsgw <- function(object, newdata=NULL, tvec=NULL, burnin=object$control$
   }
 
   if (!is.null(tvec)) {
-    
+  
     # TODO: we need an upper bound on length of tvec to avoid memory blow-up
     if (length(tvec)==1) tvec <- seq(from=0.0, to=object$tmax, length.out=tvec) # tvec is interpreted as number of time points
-    
     nt <- length(tvec)
+    mem.gb.per.iter <- 3*8*nt*nobs/(1024*1024*1024)
+    required.mem.gb <- 3*8*iter*nt*nobs/(1024*1024*1024)
+    
     tvec <- as.matrix(tvec)
     t_mat <- tvec[,rep(1,nobs)]
     
     # making sure returned prediction objects are not too big
-    required.mem.gb <- 3*8*iter*nt*nobs/(1024*1024*1024)
     if (required.mem.gb>object$control$memlim.gb)
       stop("require memory exceeds specified limit\nconsider increasing limit via memlim.gb parameter or making prediction for a subset of data")
     
-    ret <- lapply(1:iter, FUN=function(i) {
-      xbeta <- X%*%object$smp$beta[i,]
-      xbetas <- Xs%*%object$smp$betas[i,]
-      if (object$ordweib) {
-        alpha <- exp(xbetas)
-      } else {
-        alpha <- alpha.min + (alpha.max-alpha.min)/(1+exp(-xbetas))
+    if (ncores==1) {
+      xbeta.all <- X%*%t(object$smp$beta)
+      xbetas.all <- Xs%*%t(object$smp$betas)
+      ret <- lapply(1:iter, FUN=function(i) {
+        xbeta <- xbeta.all[,i,drop=F]
+        xbetas <- xbetas.all[,i,drop=F]
+        if (object$ordweib) {
+          alpha <- exp(xbetas)
+        } else {
+          alpha <- alpha.min + (alpha.max-alpha.min)/(1+exp(-xbetas))
+        }
+        survreg.scale <- 1/alpha
+        exbeta <- as.matrix(exp(xbeta))
+        alpha_mat <- t(alpha[,rep(1,nt)])
+        exbeta_mat <- t(exbeta[,rep(1,nt)])
+        
+        Htmp <- (t_mat^alpha_mat)*exbeta_mat
+        htmp <- alpha_mat*(t_mat^(alpha_mat-1))*exbeta_mat
+        
+        return (list(h=htmp, H=Htmp, survreg.scale=survreg.scale))
+      })
+    } else {
+      registerDoParallel(ncores)
+      ret <- foreach (i=1:iter, .options.multicore=list(preschedule=TRUE)) %dopar% {
+        xbeta <- X%*%object$smp$beta[i,]
+        xbetas <- Xs%*%object$smp$betas[i,]
+        if (object$ordweib) {
+          alpha <- exp(xbetas)
+        } else {
+          alpha <- alpha.min + (alpha.max-alpha.min)/(1+exp(-xbetas))
+        }
+        survreg.scale <- 1/alpha
+        exbeta <- as.matrix(exp(xbeta))
+        alpha_mat <- t(alpha[,rep(1,nt)])
+        exbeta_mat <- t(exbeta[,rep(1,nt)])
+        
+        Htmp <- (t_mat^alpha_mat)*exbeta_mat
+        htmp <- alpha_mat*(t_mat^(alpha_mat-1))*exbeta_mat
+        
+        return (list(h=htmp, H=Htmp, survreg.scale=survreg.scale))
       }
-      survreg.scale <- 1/alpha
-      exbeta <- as.matrix(exp(xbeta))
-      alpha_mat <- t(alpha[,rep(1,nt)])
-      exbeta_mat <- t(exbeta[,rep(1,nt)])
-      
-      Htmp <- (t_mat^alpha_mat)*exbeta_mat
-      htmp <- alpha_mat*(t_mat^(alpha_mat-1))*exbeta_mat
-      
-      return (list(h=htmp, H=Htmp, survreg.scale=survreg.scale))
-    })
+    }
+
     h <- array(NA, dim=c(iter, nt, nobs))
     H <- array(NA, dim=c(iter, nt, nobs))
     survreg.scale <- array(NA, dim=c(iter, nobs))
@@ -416,9 +442,11 @@ predict.bsgw <- function(object, newdata=NULL, tvec=NULL, burnin=object$control$
       H[i,,] <- ret[[i]]$H
       survreg.scale[i,] <- ret[[i]]$survreg.scale
     }
+
     S <- exp(-H)
-    survreg.scale_median <- apply(survreg.scale[(burnin+1):iter,], 2, median)
     
+    survreg.scale_median <- apply(survreg.scale[(burnin+1):iter,], 2, median)
+  
   } else {
     h <- NA
     H <- NA
@@ -460,12 +488,12 @@ predict.bsgw <- function(object, newdata=NULL, tvec=NULL, burnin=object$control$
 
 summary.predict.bsgw <- function(object, idx=1:length(object$median$survreg.scale), burnin=object$burnin
                                  , pval=0.05, popmean=identical(idx,1:length(object$median$survreg.scale))
-                                 , make.plot=TRUE, ...) {
+                                 , make.plot=TRUE, ...) { # TODO: verify this function, it was accidentally modified during editing of mixture model
   if (!all(idx %in% 1:length(object$median$survreg.scale))) {
     stop("invalid idx argument")
   }
   if (is.null(object$tvec)) {
-    cat("prediction object does not contain time-dependent entities")
+    cat("prediction summary must be applied to time-dependent prediction entities")
     return (NULL) # TODO: can't we still return something useful?!
   }
   CI_prob <- c(pval/2, 0.5, 1-pval/2)
@@ -580,52 +608,108 @@ summary.predict.bsgw <- function(object, idx=1:length(object$median$survreg.scal
                , km.fit=object$km.fit))
 }
 
-bsgw.crossval <- function(data, folds, all=FALSE, print.level=1, control=bsgw.control(), ...) {
+bsgw.crossval <- function(data, folds, all=FALSE, print.level=1, control=bsgw.control(), ncores=1, ...) {
   nfolds <- max(folds) # TODO: add more checks for validity of folds
   if (all) {
-    ret <- lapply (1:nfolds, function(n) {
-      if (print.level>=1) cat("processing fold", n, "of", nfolds, "\n")
-      flush.console()
-      est <- bsgw(data=data[which(folds!=n),], control=control, print.level=print.level, ...)
-      pred <- predict(est, newdata=data[which(folds==n),], burnin=control$burnin)
-      ret <- max(pred$smp$loglike)
-      attr(ret, "estobj") <- est
-      return (ret)
-    })
+    if (ncores==1) {
+      ret <- lapply (1:nfolds, function(n) {
+        if (print.level>=1) cat("processing fold", n, "of", nfolds, "\n")
+        flush.console()
+        est <- bsgw(data=data[which(folds!=n),], control=control, print.level=print.level, ...)
+        pred <- predict(est, newdata=data[which(folds==n),], burnin=control$burnin)
+        ret <- max(pred$smp$loglike)
+        attr(ret, "estobj") <- est
+        return (ret)
+      })
+    } else { # parallel code; TODO: set upper bound on ncores based on maximum processor cores
+      registerDoParallel(ncores)
+      ret <- foreach (n=1:nfolds, .options.multicore=list(preschedule=FALSE)) %dopar% {
+        if (print.level>=1) cat("processing fold", n, "of", nfolds, "\n")
+        flush.console()
+        est <- bsgw(data=data[which(folds!=n),], control=control, print.level=print.level, ...)
+        pred <- predict(est, newdata=data[which(folds==n),], burnin=control$burnin)
+        ret <- max(pred$smp$loglike)
+        attr(ret, "estobj") <- est
+        return (ret)
+      }
+    }
     fret <- sum(unlist(ret))
     estobjs <- list()
     for (n in 1:nfolds) estobjs[[n]] <- attr(ret[[n]], "estobj")
     attr(fret, "estobjs") <- estobjs
     return (fret)
   } else {
-    loglike <- sapply (1:nfolds, function(n) {
-      if (print.level>=1) cat("processing fold", n, "of", nfolds, "\n")
-      est <- bsgw(data=data[which(folds!=n),], control=control, print.level=print.level, ...)
-      pred <- predict(est, newdata=data[which(folds==n),], burnin=control$burnin)
-      return (max(pred$smp$loglike))
-    })
-    return (sum(loglike))
+    if (ncores==1) {
+      loglike <- sapply (1:nfolds, function(n) {
+        if (print.level>=1) cat("processing fold", n, "of", nfolds, "\n")
+        est <- bsgw(data=data[which(folds!=n),], control=control, print.level=print.level, ...)
+        pred <- predict(est, newdata=data[which(folds==n),], burnin=control$burnin)
+        return (max(pred$smp$loglike))
+      })
+      return (sum(loglike))
+    } else {
+      registerDoParallel(ncores)
+      loglike <- foreach (n=1:nfolds, .options.multicore=list(preschedule=FALSE), .combine=c) %dopar% {
+        if (print.level>=1) cat("processing fold", n, "of", nfolds, "\n")
+        est <- bsgw(data=data[which(folds!=n),], control=control, print.level=print.level, ...)
+        pred <- predict(est, newdata=data[which(folds==n),], burnin=control$burnin)
+        return (max(pred$smp$loglike))
+      }
+      return (sum(loglike))
+    }
   }
 }
 
 # TODO: under construction
-bsgw.crossval.wrapper <- function(data, folds, all=FALSE, print.level=1, control=bsgw.control()
+bsgw.crossval.wrapper <- function(data, folds, all=FALSE, print.level=1, control=bsgw.control(), ncores=1
                                   , lambda.vec=exp(seq(from=log(0.01), to=log(100), length.out = 10))
                                   , lambdas.vec=NULL
                                   , lambda2=if (is.null(lambdas.vec)) cbind(lambda=lambda.vec, lambdas=lambda.vec)
                                   else as.matrix(expand.grid(lambda=lambda.vec, lambdas=lambdas.vec)), plot=TRUE, ...) {
+  # TODO: need to impose upper bound on ncores by physical number of cores on system
+  nfold <- length(unique(folds))
+  # determining if to parallelize inner loop (over folds) or outer loop (over lambda's)
+  # preference is inner due to better load balancing, unless we have more cores than folds
+  # TODO: this logic can be improved, e.g. what if ncores=2 and nfold=3? then parallelization gain is only 3/2=1.5
+  # but if there are many lambda combinations in outer loop then despite potentially uneven times, we can use dynamic
+  # scheduling and gain better performance
+  if (ncores<=nfold && nfold%%ncores==0) {
+    if (print.level>=1) cat("using inner parallelization\n")
+    ncores.inner <- ncores
+    ncores.outer <- 1
+  } else {
+    if (print.level>=1) cat("using outer parallelization\n")
+    ncores.inner <- 1
+    ncores.outer <- ncores
+  }
   nlambda <- nrow(lambda2)
   loglike <- rep(NA, nlambda)
   estobjs <- list()
   if (print.level>=1) cat("number of lambda combinations to test:", nlambda, "\n")
-  for (i in 1:nlambda) { # TODO: keep this loop sequential due to load imbalance across different lambda's; parallelize folds within
-    if (print.level>=1) cat("processing lambda combo", i, "of", nlambda, "\n")
-    flush.console()
-    control$lambda <- lambda2[i,"lambda"]
-    control$lambdas <- lambda2[i,"lambdas"]
-    ret <- bsgw.crossval(data=data, folds=folds, all=all, print.level=print.level, control=control, ...)
-    loglike[i] <- ret
-    if (all) estobjs[[i]] <- attr(ret, "estobjs")
+  if (ncores.outer==1) {
+    for (i in 1:nlambda) {
+      if (print.level>=1) cat("processing lambda combo", i, "of", nlambda, "\n")
+      flush.console()
+      control$lambda <- lambda2[i,"lambda"]
+      control$lambdas <- lambda2[i,"lambdas"]
+      ret <- bsgw.crossval(data=data, folds=folds, all=all, print.level=print.level, control=control, ncores=ncores.inner, ...)
+      loglike[i] <- ret
+      if (all) estobjs[[i]] <- attr(ret, "estobjs")
+    }
+  } else {
+    registerDoParallel(ncores.outer)
+    ret.all <- foreach (i=1:nlambda, .options.multicore=list(preschedule=FALSE)) %dopar% {
+      if (print.level>=1) cat("processing lambda combo", i, "of", nlambda, "\n")
+      flush.console()
+      control$lambda <- lambda2[i,"lambda"]
+      control$lambdas <- lambda2[i,"lambdas"]
+      ret <- bsgw.crossval(data=data, folds=folds, all=all, print.level=print.level, control=control, ncores=ncores.inner, ...)
+      return (list(loglike=ret, estobj=attr(ret, "estobjs")))
+    }
+    for (i in 1:nlambda) {
+      loglike[i] <- ret.all[[i]]$loglike
+      estobjs[[i]] <- ret.all[[i]]$estobj
+    }
   }
   opt.index <- which(loglike==max(loglike))[1]
   lambda.opt <- lambda2[opt.index,"lambda"]

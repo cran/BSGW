@@ -9,7 +9,7 @@ Predict method for bsgw model fits
 Calculates log-likelihood and hazard/cumulative hazard/survival functions over a user-supplied vector time values, based on BSGW model object.
 }
 \usage{
-\method{predict}{bsgw}(object, newdata=NULL, tvec=NULL, burnin=object$control$burnin, ...)
+\method{predict}{bsgw}(object, newdata=NULL, tvec=NULL, burnin=object$control$burnin, ncores=1, ...)
 \method{summary}{predict.bsgw}(object, idx=1:length(object$median$survreg.scale), burnin=object$burnin, pval=0.05
   , popmean=identical(idx,1:length(object$median$survreg.scale)), make.plot=TRUE, ...)
 }
@@ -19,6 +19,7 @@ Calculates log-likelihood and hazard/cumulative hazard/survival functions over a
   \item{newdata}{An optional data frame in which to look for variables with which to predict. If omiited, the fitted values (training set) are used.}
   \item{tvec}{An optional vector of time values, along which time-dependent entities (hazard, cumulative hazard, survival) will be predicted. If omitted, only the time-independent entities (currently only log-likelihood) will be calculated. If a single integer is provided for \code{tvec}, it is interpreted as number of time points, equally spaced from \code{0} to \code{object$tmax: tvec <- seq(from=0.0, to=object$tmax, length.out=tvec)}.}
   \item{burnin}{Number of samples to discard from the beginning of each MCMC chain before calculating median value(s) for time-independent entities.}
+  \item{ncores}{Number of cores to use for parallel prediction.}
   \item{...}{Further arguments to be passed to/from other methods.}
   \item{idx}{Index of observations (rows of \code{newdata} or training data) for which to generate summary statistics. Default is the entire data.}
   \item{pval}{Desired p-value, based on which lower/upper bounds will be calculated. Default is \code{0.05}.}
@@ -53,5 +54,4 @@ predsumm <- summary(pred, idx=1:10)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
-\keyword{ ~kwd1 }
-\keyword{ ~kwd2 }% __ONLY ONE__ keyword per line
+

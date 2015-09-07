@@ -1,22 +1,4 @@
 # evaluating h,H,S as well as alpha (scale parameter in survreg), lp (linear predictor)
-bsgw.eval.old <- function(coeff, X, Xs, t, ordweib=FALSE) {
-  K <- ncol(X)
-  Ks <- ncol(Xs)
-  beta <- coeff[1:K] # scale coefficients, corresponds to ordinary Weibull coefficients
-  betas <- coeff[K+1:Ks] # shape coefficients
-  lp <- X%*%beta
-  if (ordweib) {
-    scale <- exp(-betas[1])
-  } else {
-    scale <- exp(Xs%*%betas)
-  }
-  expterm <- exp(-lp)
-  H <- t^(1/scale) * expterm
-  h <- (1/scale) * t^(1/scale-1) * expterm
-  S <- exp(-H)
-  return (list(h=h, H=H, S=S, scale=scale, lp=lp))
-}
-
 bsgw.eval <- function(coeff, X, Xs, t, ordweib=FALSE, alpha.min=0.1, alpha.max=10.0) {
   K <- ncol(X)
   Ks <- ncol(Xs)
@@ -41,7 +23,7 @@ bsgw.loglike <- function(coeff, X, Xs, t, s, ...) {
 }
 
 bsgw.logpost <- function(coeff, X, Xs, t, s, lambda, lambdas, ...) {
-  return (bsgw.loglike(coeff, X, Xs, t, s, ...) + lambda*sum(abs(coeff[1:ncol(X)])) + lambdas*sum(abs(coeff[ncol(X)+1:ncol(Xs)])))
+  return (bsgw.loglike(coeff, X, Xs, t, s, ...) - lambda*sum(abs(coeff[1:ncol(X)])) - lambdas*sum(abs(coeff[ncol(X)+1:ncol(Xs)])))
 }
 
 bsgw.mcmc <- function(X, Xs, t, s, lambda, lambdas, iter=1000, sd.thresh=1e-06
@@ -77,12 +59,21 @@ bsgw.mcmc <- function(X, Xs, t, s, lambda, lambdas, iter=1000, sd.thresh=1e-06
   }
   
   for (n in 1:iter) {
-    coeffs <- bsgw.multislice.from.unislice(c(beta[idx], betas[idxs]), bsgw.logpost, X[,idx,drop=F], Xs[,idxs,drop=F]
-                                                 , t, s, lambda, lambdas
-                                                 , ordweib=ordweib, alpha.min=alpha.min, alpha.max=alpha.max, w=w, m=mbeta
-                                            , lower=c(c(-Inf,rep(-beta.max,N-1)),c(-Inf,rep(-betas.max,Ns-1)))
-                                            , upper=c(c(+Inf,rep(+beta.max,N-1)),c(+Inf,rep(+betas.max,Ns-1)))
-                                            )
+    #bsgw.logpost <- function(coeff, X, Xs, t, s, lambda, lambdas, ...)
+    coeffs <- MfU.Sample(c(beta[idx], betas[idxs]), f=bsgw.logpost, uni.sampler="slice"
+      , X=X[,idx,drop=FALSE], Xs=Xs[,idxs,drop=FALSE], t=t, s=s, lambda=lambda, lambdas=lambdas
+      , ordweib=ordweib, alpha.min=alpha.min, alpha.max=alpha.max
+      , control=MfU.Control(n=N+Ns, slice.w=w, slice.m=mbeta
+        , slice.lower=c(c(-Inf,rep(-beta.max,N-1)),c(-Inf,rep(-betas.max,Ns-1)))
+        , slice.upper=c(c(+Inf,rep(+beta.max,N-1)),c(+Inf,rep(+betas.max,Ns-1)))
+        )
+      )
+    #coeffs <- bsgw.multislice.from.unislice(c(beta[idx], betas[idxs]), bsgw.logpost, X[,idx,drop=F], Xs[,idxs,drop=F]
+    #                                             , t, s, lambda, lambdas
+    #                                             , ordweib=ordweib, alpha.min=alpha.min, alpha.max=alpha.max, w=w, m=mbeta
+    #                                        , lower=c(c(-Inf,rep(-beta.max,N-1)),c(-Inf,rep(-betas.max,Ns-1)))
+    #                                        , upper=c(c(+Inf,rep(+beta.max,N-1)),c(+Inf,rep(+betas.max,Ns-1)))
+    #                                        )
     beta[idx] <- coeffs[1:N]
     betas[idxs] <- coeffs[N+1:Ns]
     beta_smp[n,] <- beta
