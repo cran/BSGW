@@ -17,18 +17,26 @@ bsgw.eval <- function(coeff, X, Xs, t, ordweib=FALSE, alpha.min=0.1, alpha.max=1
   return (list(h=h, H=H, S=S, scale=1/alpha, lp=lp))
 }
 
-bsgw.loglike <- function(coeff, X, Xs, t, s, ...) {
+bsgw.loglike <- function(coeff, X, Xs, t, s, right.censoring, ...) {
   ret <- bsgw.eval(coeff, X, Xs, t, ...)
-  return (sum((s*log(ret$h)-ret$H)))
+  if (right.censoring) return (sum((s*log(ret$h)-ret$H)))
+  else {
+    index.death <- which(s == 1)
+    sum.death <- sum(log(ret$h[index.death]) - ret$H[index.death])
+    sum.censoring <- sum(log(1 - ret$S[-index.death]))
+    return (sum.death + sum.censoring)
+  }
+  #else return (sum(s*log(ret$h) + log(1 - ret$S)))
 }
 
-bsgw.logpost <- function(coeff, X, Xs, t, s, lambda, lambdas, ...) {
-  return (bsgw.loglike(coeff, X, Xs, t, s, ...) - lambda*sum(abs(coeff[1:ncol(X)])) - lambdas*sum(abs(coeff[ncol(X)+1:ncol(Xs)])))
+bsgw.logpost <- function(coeff, X, Xs, t, s, lambda, lambdas, right.censoring, ...) {
+  return (bsgw.loglike(coeff, X, Xs, t, s, right.censoring, ...) - lambda*sum(abs(coeff[1:ncol(X)])) - lambdas*sum(abs(coeff[ncol(X)+1:ncol(Xs)])))
 }
 
 bsgw.mcmc <- function(X, Xs, t, s, lambda, lambdas, iter=1000, sd.thresh=1e-06
                       , init=NULL, ordweib=FALSE, alpha.min=0.1, alpha.max=10.0, beta.max=log(20), betas.max=5.0
-                      , print.level=2, nskip=10) {
+                      , print.level=2, nskip=10, right.censoring = 1) {
+  #browser()
   mbeta <- 100 # TODO: convert from magic number to parameter that can be controlled
   w <- 1.0 # TODO: same as above
   K <- ncol(X)
@@ -62,6 +70,7 @@ bsgw.mcmc <- function(X, Xs, t, s, lambda, lambdas, iter=1000, sd.thresh=1e-06
     #bsgw.logpost <- function(coeff, X, Xs, t, s, lambda, lambdas, ...)
     coeffs <- MfU.Sample(c(beta[idx], betas[idxs]), f=bsgw.logpost, uni.sampler="slice"
       , X=X[,idx,drop=FALSE], Xs=Xs[,idxs,drop=FALSE], t=t, s=s, lambda=lambda, lambdas=lambdas
+      , right.censoring = right.censoring
       , ordweib=ordweib, alpha.min=alpha.min, alpha.max=alpha.max
       , control=MfU.Control(n=N+Ns, slice.w=w, slice.m=mbeta
         , slice.lower=c(c(-Inf,rep(-beta.max,N-1)),c(-Inf,rep(-betas.max,Ns-1)))

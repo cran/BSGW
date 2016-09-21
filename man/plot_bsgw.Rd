@@ -23,9 +23,10 @@ Four sets of MCMC diagnostic plots are currently generated: 1) log-likelihood an
 \author{Alireza S. Mahani, Mansour T.A. Sharabiani}
 
 \examples{
-data(lung)
+library("survival")
+data(ovarian)
 est <- bsgw(Surv(futime, fustat) ~ ecog.ps + rx, ovarian
-            , control=bsgw.control(iter=800, nskip=100))
+            , control=bsgw.control(iter=400, nskip=100))
 plot(est)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the

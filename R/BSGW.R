@@ -1,6 +1,7 @@
 # estimate
 # inside control: lambda, lambdas, alpha.min, alpha.max, beta.max, iter, sd.thresh, scalex
-bsgw <- function(formula, data, formulas=formula, weights, subset, na.action=na.fail, init="survreg"
+bsgw <- function(formula, data, formulas=formula, weights, subset, na.action=na.fail
+                 , init = "survreg"
                  , ordweib=FALSE, scale=0, control=bsgw.control(), print.level=2) {
   # TODO: implement weights, subset, na.action, scale
   # TODO: add robustness to init: 1) add bsgw objects, 2) allow failover when survreg doesn't work
@@ -19,6 +20,12 @@ bsgw <- function(formula, data, formulas=formula, weights, subset, na.action=na.
   mt <- attr(mf, "terms")
   X <- model.matrix(mt, mf)
   y <- model.response(mf, "numeric")
+  
+  censoring.type <- attr(y, "type")
+  if (! (censoring.type %in% c("left", "right"))) stop("invalid censoring type; only left and right are currently supported")
+  right.censoring <- 1 * (censoring.type == "right")
+  #if (right.censoring == 0) cat("using left censoring...\n")
+  
   colnamesX <- colnames(X)
   if (colnamesX[1]!="(Intercept)") stop("intercept term must be included in formula")
   
@@ -29,21 +36,39 @@ bsgw <- function(formula, data, formulas=formula, weights, subset, na.action=na.
   if (colnamesXs[1]!="(Intercept)") stop("intercept term must be included in formulas")
 
   if (init[1]=="survreg") { # using survreg to initialize the coefficients
-    wreg <- survreg(formula, data) # TODO: make sure all relevant parameters are passed to this call, e.g. na.action
-    alpha.ow <- 1/wreg$scale
-    betas.0 <- if (ordweib) log(alpha.ow) else log((alpha.ow-control$alpha.min)/(control$alpha.max-alpha.ow))
-    beta <- unname(-wreg$coefficients/wreg$scale)
-    init <- list(beta=beta, betas=c(betas.0, rep(0, ncol(Xs)-1)))
-    survreg.scale.ref <- wreg$scale
+    wreg <- tryCatch(survreg(formula, data)
+                     , error = function(e) e, warning = function(w) w) # TODO: make sure all relevant parameters are passed to this call, e.g. na.action
+    if (is(wreg, "error") || is(wreg, "warning")) {
+      warning("survreg deemed unreliable for initialization; using naive method")
+      init <- list(beta=rep(0,ncol(X)), betas=rep(0,ncol(Xs)))
+      survreg.scale.ref <- NULL
+      wreg <- NULL
+    } else {
+      alpha.ow <- 1/wreg$scale
+      betas.0 <- if (ordweib) log(alpha.ow) else log((alpha.ow-control$alpha.min)/(control$alpha.max-alpha.ow))
+      beta <- unname(-wreg$coefficients/wreg$scale)
+      
+      # make sure initialized coefficients are within boundaries defined in bsgw.control
+      betas.0 <- max(min(betas.0, abs(control$betas.max)), -abs(control$betas.max))
+      beta <- pmax(pmin(beta, abs(control$beta.max)), -abs(control$beta.max))
+      
+      init <- list(beta=beta, betas=c(betas.0, rep(0, ncol(Xs)-1)))
+      survreg.scale.ref <- wreg$scale
+    }
   } else if (class(init)=="survreg") { # using a previous survreg estimation object
     wreg <- init
     alpha.ow <- 1/wreg$scale
     betas.0 <- if (ordweib) log(alpha.ow) else log((alpha.ow-control$alpha.min)/(control$alpha.max-alpha.ow))
     beta <- unname(-wreg$coefficients/wreg$scale)
+    
+    # make sure initialized coefficients are within boundaries defined in bsgw.control
+    betas.0 <- max(min(betas.0, abs(control$betas.max)), -abs(control$betas.max))
+    beta <- pmax(pmin(beta, abs(control$beta.max)), -abs(control$beta.max))
+    
     init <- list(beta=beta, betas=c(betas.0, rep(0, ncol(Xs)-1)))
     survreg.scale.ref <- wreg$scale
   } else {
-    warning("init argument not recognized, initializing all coefficient to zero") # TODO: is this desired behavior?
+    warning("init argument not recognized, initializing all coefficients to zero") # TODO: is this desired behavior?
     init <- list(beta=rep(0,ncol(X)), betas=rep(0,ncol(Xs)))
     survreg.scale.ref <- NULL
     wreg <- NULL
@@ -74,16 +99,18 @@ bsgw <- function(formula, data, formulas=formula, weights, subset, na.action=na.
                        , centerVec.Xs=attr(Xs, "centerVec"), scaleVec.Xs=attr(Xs, "scaleVec")))
   }
   
+  #browser()
   mcmc <- bsgw.mcmc(X, Xs, y[,1], y[,2], control$lambda, control$lambdas, iter=control$iter, sd.thresh=control$sd.thresh
                     , init=init, ordweib=ordweib, alpha.min=control$alpha.min, alpha.max=control$alpha.max, beta.max=control$beta.max
-                    , print.level=print.level, nskip=control$nskip)
+                    , betas.max = control$betas.max
+                    , print.level=print.level, nskip=control$nskip, right.censoring = right.censoring)
   sel <- (control$burnin+1):control$iter
   median <- list(beta=apply(mcmc$beta[sel,,drop=F], 2, median), betas=apply(mcmc$betas[sel,,drop=F], 2, median)
                  , survreg.scale=apply(mcmc$scale[sel,,drop=F], 2, median))
   
   km.fit <- survfit(bsgw.strip.formula(formula), data)
   
-  ret <- c(ret, list(idx=mcmc$idx, idxs=mcmc$idx, median=median
+  ret <- c(ret, list(idx=mcmc$idx, idxs=mcmc$idxs, median=median
               , smp=list(beta=mcmc$beta, betas=mcmc$betas, survreg.scale=mcmc$scale, lp=mcmc$lp, loglike=mcmc$loglike, logpost=mcmc$logpost)
            , km.fit=km.fit, tmax=max(y[,1])))
   class(ret) <- "bsgw"
@@ -133,7 +160,7 @@ plot.bsgw <- function(x, pval=0.05, burnin=round(x$control$iter/2), nrow=2, ncol
   
   ## loglike and logpost
   # TODO: adjust ylim to make sure ordreg loglike is visible
-  par(mfrow=c(2,2))
+  oldpar <- par(mfrow=c(2,2))
   plot(x$smp$loglike, type="l", xlab="Iteration", ylab="Log-likelihood", main="Log-likelihood, All")
   if (!is.null(x$ordreg)) abline(h=x$ordreg$loglik[2], lty=2, col="red")
   plot(x$smp$logpost, type="l", xlab="Iteration", ylab="Log-posterior", main="Log-posterior, All")
@@ -296,6 +323,7 @@ plot.bsgw <- function(x, pval=0.05, burnin=round(x$control$iter/2), nrow=2, ncol
       }
     }
   }
+  par(oldpar)
 }
 
 summary.bsgw <- function(object, pval=0.05, burnin=object$control$burnin, ...) {

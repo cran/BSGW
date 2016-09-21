@@ -37,8 +37,10 @@ See \link{summary} for a description of the generic method.
 The model fitting function is \link{bsgw}.
 }
 \examples{
+library("survival")
+data(ovarian)
 est <- bsgw(Surv(futime, fustat) ~ ecog.ps + rx, ovarian
-            , control=bsgw.control(iter=800, nskip=100))
+            , control=bsgw.control(iter=400, nskip=100))
 summary(est, pval=0.1)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the

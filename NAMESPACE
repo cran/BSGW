@@ -1,5 +1,5 @@
-import(survival)
-import(MfUSampler)
+importFrom("survival", "survreg", "survfit")
+importFrom("MfUSampler", "MfU.Sample", "MfU.Control")
 
 export(bsgw, bsgw.crossval, bsgw.crossval.wrapper, bsgw.generate.folds, bsgw.generate.folds.eventbalanced, bsgw.control)
 
@@ -19,3 +19,4 @@ importFrom("stats", ".getXlevels", "acf", "delete.response",
 importFrom("utils", "flush.console")
 importFrom("foreach", "foreach", "%dopar%")
 importFrom("doParallel", "registerDoParallel")
+importFrom("methods", "is")

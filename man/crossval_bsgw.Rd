@@ -51,11 +51,13 @@ Functions \code{bsgw.generate.folds} and \code{bsgw.generate.folds.eventbalanced
 \author{Alireza S. Mahani, Mansour T.A. Sharabiani}
 
 \examples{
+library("survival")
+data(ovarian)
 folds <- bsgw.generate.folds.eventbalanced(Surv(futime, fustat) ~ 1, ovarian, 5)
 cv <- bsgw.crossval(ovarian, folds, formula=Surv(futime, fustat) ~ ecog.ps + rx
-  , control=bsgw.control(iter=100, nskip=10), print.level = 3)
+  , control=bsgw.control(iter=50, nskip=10), print.level = 3)
 cv2 <- bsgw.crossval.wrapper(ovarian, folds, formula=Surv(futime, fustat) ~ ecog.ps + rx
-  , control=bsgw.control(iter=100, nskip=10)
+  , control=bsgw.control(iter=50, nskip=10)
   , print.level=3, lambda.vec=exp(seq(from=log(0.1), to=log(1), length.out = 3)))
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the

@@ -1,3 +1,12 @@
+Changes in version 0.9.2
+  * Added betas.max to list of arguments passed to bsgw.mcmc() inside bsgw()
+  * Added support for left-censoring.
+  * Return graphic parameters to prior value before exiting plot.bsgw()
+  * Fixed bug that caused idxs to be same as idx in return list from bsgw()
+  * Added logic in bsgw() to clamp initialized coefficient values at values specified in bsgw.control()
+  * Edited documentation files
+  * Edited DESCRIPTION and NAMESPACE to import individual functions from MfUSampler and survival rather than entire package
+
 Changes in version 0.9.1
   * Fixed penalty terms in log-posterior (changed sign of lambda terms in bsgw.logpost from positive to negative).
   * Removed placeholder keyword sections from .Rd files.

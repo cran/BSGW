@@ -47,8 +47,10 @@ The function \code{summary.predict.bsgw} returns a list with the following field
 \author{Alireza S. Mahani, Mansour T.A. Sharabiani}
 
 \examples{
+library("survival")
+data(ovarian)
 est <- bsgw(Surv(futime, fustat) ~ ecog.ps + rx, ovarian
-            , control=bsgw.control(iter=800, nskip=100))
+            , control=bsgw.control(iter=400, nskip=100))
 pred <- predict(est, tvec=100)
 predsumm <- summary(pred, idx=1:10)
 }

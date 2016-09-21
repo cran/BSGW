@@ -20,13 +20,13 @@ bsgw.control(scalex=TRUE, iter=1000, burnin=round(iter/2), sd.thresh=1e-4
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{formula}{Survival formula expressing the time/status variables as well as covariates used in regression on scale parameter.}
+  \item{formula}{Survival formula expressing the time/status variables as well as covariates used in regression on scale parameter. Currently, only right and left censoring is supported. Must include intercept term.}
   \item{data}{Data frame containing the covariates and response variable.}
-  \item{formulas}{Formula expressing the covariates used in regression on shape parameter. No left-hand side is necessary since the response variable information is extracted from \code{formula}. Default value is \code{formula}.}
+  \item{formulas}{Formula expressing the covariates used in regression on shape parameter. No left-hand side is necessary since the response variable information is extracted from \code{formula}. Default value is \code{formula}. Must include intercept term.}
   \item{weights}{Optional vector of case weights. *Not supported yet*}
   \item{subset}{Subset of the observations to be used in the fit. *Not supported yet*}
   \item{na.action}{Missing-data filter function. *Not supported yet (only na.fail behavior works)*}
-  \item{init}{Initialization behavior. Currently, two options are supported: 1) If \code{init="survreg"}, an ordinary Weibull regression is performed and coefficients are used to initialize the bsgw MCMC run. 2) If \code{init} is a \code{survreg} object, e.g. from a previous Weibull regression fit, the object can be directly passed as parameter.}
+  \item{init}{Initialization behavior. Currently, three options are supported: 1) If \code{init="survreg"}, an ordinary Weibull regression is performed and coefficients are used to initialize the bsgw MCMC run. 2) If \code{init} is a \code{survreg} object, e.g. from a previous Weibull regression fit, the object can be directly passed as parameter. 3) If \code{init} is any other value, or if \code{survreg} produces error or warning, we simply set all coefficients to zero.}
   \item{ordweib}{If \code{TRUE}, a Bayesian ordinary Weibull model is estimated, in which any covariates in \code{formulas} are stripped away, and the inverse-logit transformation in the shape-parameter regression is replaced with a simple exponential transformation. If shrinkage parameters are kept at 0, the result is a Bayesian equivalent of an ordinary Weibull regression.}
   \item{scale}{If \code{scale>0}, the value of the shape parameter is fixed, i.e. not estimated from data.}
   \item{control}{See \code{bsgw.control} for a description of the parameters inside the \code{control} list.}
@@ -102,8 +102,10 @@ For prediction, use \link{predict.bsgw}.
 }
 \examples{
 ## model estimation using 800 samples, printing progress every 100 samples
+library("survival")
+data(ovarian)
 est <- bsgw(Surv(futime, fustat) ~ ecog.ps + rx, ovarian
-            , control=bsgw.control(iter=800, nskip=100))
+            , control=bsgw.control(iter=400, nskip=100))
 
 ## comparing shape of Weibull curves between ordinary Weibull and bsgw
 ## since in bsgw shape is dependent on covariates, only a population average is meaningful
