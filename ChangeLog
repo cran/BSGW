@@ -1,3 +1,9 @@
+Changes in version 0.9.4
+  * Replaced use of the function class() in BSGW.R with inherits() per CRAN check notes.
+
+Changes in version 0.9.3
+  * Resubmitting to CRAN without any change after the archiving period due to an indirect dependency on HI via MfUSampler.
+
 Changes in version 0.9.2
   * Added betas.max to list of arguments passed to bsgw.mcmc() inside bsgw()
   * Added support for left-censoring.
@@ -6,6 +12,7 @@ Changes in version 0.9.2
   * Added logic in bsgw() to clamp initialized coefficient values at values specified in bsgw.control()
   * Edited documentation files
   * Edited DESCRIPTION and NAMESPACE to import individual functions from MfUSampler and survival rather than entire package
+  * Wrapper initialization call to survreg() inside bsgw() in tryCatch; fall back to naive (all-zero) initialization if survreg() produces an error or a warning.
 
 Changes in version 0.9.1
   * Fixed penalty terms in log-posterior (changed sign of lambda terms in bsgw.logpost from positive to negative).

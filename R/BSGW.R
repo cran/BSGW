@@ -55,7 +55,7 @@ bsgw <- function(formula, data, formulas=formula, weights, subset, na.action=na.
       init <- list(beta=beta, betas=c(betas.0, rep(0, ncol(Xs)-1)))
       survreg.scale.ref <- wreg$scale
     }
-  } else if (class(init)=="survreg") { # using a previous survreg estimation object
+  } else if (inherits(init, "survreg")) { # using a previous survreg estimation object
     wreg <- init
     alpha.ow <- 1/wreg$scale
     betas.0 <- if (ordweib) log(alpha.ow) else log((alpha.ow-control$alpha.min)/(control$alpha.max-alpha.ow))
